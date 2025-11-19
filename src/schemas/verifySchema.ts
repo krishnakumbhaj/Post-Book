@@ -1,0 +1,11 @@
+import { z } from 'zod';
+
+export const verifySchema = z.object({
+            code: z.string().length(6, 'Verification code must be 6 characters long'),
+});
+
+
+
+
+
+// bg-[#cbc6c1]

@@ -1,0 +1,27 @@
+{
+    "name": "Post-Book",
+    "short_name": "PostBook",
+    "theme_color": "#00ff00",
+    "background_color": "#ffffff",
+    "display": "standalone",
+    "orientation": "any",
+    "scope": "/",
+    "start_url": "/",
+    "icons": [
+        {
+            "src": "/icons/Logo-192.png",
+            "type": "image/png",
+            "sizes": "192x192"
+        },
+        {
+            "src": "/icons/Logo-256.png",
+            "type": "image/png",
+            "sizes": "256x256"
+        },
+        {
+            "src": "/icons/Logo-512.png",
+            "type": "image/png",
+            "sizes": "512x512"
+        }
+    ]
+}

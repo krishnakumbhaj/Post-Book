@@ -16,6 +16,7 @@ interface RDAccountCardProps {
     monthPaidUpTo: number;
     nextInstallmentDueDate: string;
     lastDepositDate?: string;
+    maturityDate?: string;
   };
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -118,6 +119,17 @@ export default function RDAccountCard({ account, onEdit, onDelete }: RDAccountCa
             <div>
               <p className="text-xs text-gray-500">Date of Last Deposit</p>
               <p className="font-medium text-gray-900">{formatDate(account.lastDepositDate)}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Maturity Date (if exists) */}
+        {account.maturityDate && (
+          <div className="flex items-center gap-3 bg-green-50 p-3 rounded-lg border border-green-200">
+            <Calendar className="h-5 w-5 text-green-600" />
+            <div>
+              <p className="text-xs text-green-700 font-medium">Account Maturity Date</p>
+              <p className="font-semibold text-gray-900">{formatDate(account.maturityDate)}</p>
             </div>
           </div>
         )}

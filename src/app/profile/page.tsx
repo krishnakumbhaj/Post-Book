@@ -7,6 +7,8 @@ import { ArrowLeft, User, Mail, Shield, LogOut, Home } from 'lucide-react';
 import { NotepadTextDashed } from 'lucide-react';
 import Image from 'next/image';
 import Logo from '../images/Logo.png';
+import PWAInstall from '@/components/PWAInstall';
+import CircularLoader from '@/components/CircularLoader';
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
@@ -15,7 +17,7 @@ export default function ProfilePage() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-[#fcfbeb] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ad010d]"></div>
+        <CircularLoader />
       </div>
     );
   }
@@ -147,6 +149,9 @@ export default function ProfilePage() {
           <p className="text-xs text-gray-400 mt-3">Version 1.0.0</p>
         </div>
       </div>
+
+      {/* PWA install prompt (only on profile page) */}
+      <PWAInstall />
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#fcfbeb] rounded-tr-3xl shadow-2xl border-t-2 border-gray-200">

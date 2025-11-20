@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import RDAccountCard from '@/components/RDAccountCard';
 import { useToast } from '@/components/ui/use-toast';
+import CircularLoader from '@/components/CircularLoader';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 
 interface RDAccount {
   _id: string;
@@ -27,6 +29,8 @@ export default function RDAccountDetailPage() {
 
   const [account, setAccount] = useState<RDAccount | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -55,13 +59,18 @@ export default function RDAccountDetailPage() {
     router.push(`/rd-account/edit?id=${accountId}`);
   };
 
-  const handleDelete = async (accountId: string) => {
-    if (!confirm('Delete this RD account?')) return;
+  const handleDelete = (accountId: string) => {
+    setAccountToDelete(accountId);
+    setConfirmDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!accountToDelete) return;
     try {
-      const res = await fetch(`/api/rd-account/delete?id=${accountId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/rd-account/delete?id=${accountToDelete}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.ok) {
-        toast({ title: 'Deleted', description: 'RD account deleted' });
+        toast({ title: 'Deleted', description: 'RD account deleted successfully' });
         router.push('/rd-account/display');
       } else {
         toast({ title: 'Error', description: data.error || 'Failed to delete', variant: 'destructive' });
@@ -69,6 +78,8 @@ export default function RDAccountDetailPage() {
     } catch (err) {
       console.error('Delete error:', err);
       toast({ title: 'Error', description: 'Failed to delete', variant: 'destructive' });
+    } finally {
+      setAccountToDelete(null);
     }
   };
 
@@ -83,7 +94,7 @@ export default function RDAccountDetailPage() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ad010d]"></div>
+          <CircularLoader />
         </div>
       ) : account ? (
         <div className="max-w-3xl mx-auto">
@@ -94,6 +105,20 @@ export default function RDAccountDetailPage() {
           <p className="text-gray-600">Account not found.</p>
         </div>
       )}
+
+      <ConfirmationDialog
+        isOpen={confirmDialogOpen}
+        onClose={() => {
+          setConfirmDialogOpen(false);
+          setAccountToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Account"
+        message={`Are you sure you want to permanently delete this RD account? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -5,7 +5,6 @@ import AuthProvider from "./context/AuthProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { LoadingProvider } from "@/app/context/LoadingContext";
 import AppWrapper from "@/components/AppWrapper";
-import PWAInstall from "@/components/PWAInstall";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -57,7 +56,6 @@ export default function RootLayout({
               {children}
             </AppWrapper>
           </LoadingProvider>
-          <PWAInstall />
           <Toaster />
         </AuthProvider>
       </body>

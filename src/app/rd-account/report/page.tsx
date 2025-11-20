@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Search, Plus, Minus, PackagePlus, X, Check, ArrowLeft, Calendar } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import axios from 'axios';
+import CircularLoader from '@/components/CircularLoader';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 
 interface RDAccount {
   _id: string;
@@ -52,6 +54,8 @@ export default function ReportPage() {
   // Denomination single-handle slider (>= selected value, 500 step increments)
   const [denomValue, setDenomValue] = useState<number>(500);
   const [sortByDueDate, setSortByDueDate] = useState<'none' | 'asc' | 'desc'>('none');
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [itemToRemove, setItemToRemove] = useState<{ accountId: string; accountNo: string } | null>(null);
 
   // Load user's RD accounts
   useEffect(() => {
@@ -119,9 +123,47 @@ export default function ReportPage() {
     }
   };
 
-  const loadOrCreateSession = async (userId: string) => {
+  const loadOrCreateSession = async (userId: string, opts?: { forceNew?: boolean }) => {
     try {
-      // Always create a new session for this report
+      // If caller requests a fresh session, create it regardless of existing ongoing/draft
+      if (opts?.forceNew) {
+        const response = await axios.post('/api/rd-account/payment-session', {
+          userId,
+          paymentMethod,
+        });
+
+        if (response.data.ok) {
+          setCurrentSession(response.data.session);
+        }
+        return;
+      }
+
+      // Try to find an existing ongoing or draft session WITHOUT any added items
+      const ongoingResp = await axios.get(`/api/rd-account/payment-session?status=ongoing&userId=${userId}`);
+      if (ongoingResp.data?.ok && ongoingResp.data.sessions && ongoingResp.data.sessions.length > 0) {
+        // Find a session that has no added items
+        const availableSession = ongoingResp.data.sessions.find((s: PaymentSession) => 
+          !s.items.some(item => item.added)
+        );
+        if (availableSession) {
+          setCurrentSession(availableSession);
+          return;
+        }
+      }
+
+      const draftResp = await axios.get(`/api/rd-account/payment-session?status=draft&userId=${userId}`);
+      if (draftResp.data?.ok && draftResp.data.sessions && draftResp.data.sessions.length > 0) {
+        // Find a session that has no added items
+        const availableSession = draftResp.data.sessions.find((s: PaymentSession) => 
+          !s.items.some(item => item.added)
+        );
+        if (availableSession) {
+          setCurrentSession(availableSession);
+          return;
+        }
+      }
+
+      // No existing usable session -> create a new one
       const response = await axios.post('/api/rd-account/payment-session', {
         userId,
         paymentMethod,
@@ -211,13 +253,18 @@ export default function ReportPage() {
     }
   };
 
-  const removeFromCart = async (accountId: string) => {
-    if (!currentSession) return;
+  const removeFromCart = (accountId: string, accountNo: string) => {
+    setItemToRemove({ accountId, accountNo });
+    setConfirmDialogOpen(true);
+  };
+
+  const confirmRemoveFromCart = async () => {
+    if (!currentSession || !itemToRemove) return;
 
     try {
       const response = await axios.patch(`/api/rd-account/payment-session/${currentSession._id}`, {
         action: 'removeItem',
-        accountId,
+        accountId: itemToRemove.accountId,
       });
 
       if (response.data.ok) {
@@ -233,6 +280,8 @@ export default function ReportPage() {
         description: 'Failed to remove account',
         variant: 'destructive',
       });
+    } finally {
+      setItemToRemove(null);
     }
   };
 
@@ -268,16 +317,17 @@ export default function ReportPage() {
       });
 
       if (response.data.ok) {
+        const committedSession = response.data.session;
         toast({
           title: 'Success',
           description: 'Report added to confirmation queue',
         });
-        
+
         // Create a fresh session for the next report
-        await loadOrCreateSession(selectedUserId);
-        
-        // Redirect to confirm page
-        router.push('/rd-account/confirm-report');
+        await loadOrCreateSession(selectedUserId, { forceNew: true });
+
+        // Redirect to confirm page and pass the committed session id so it is highlighted
+        router.push(`/rd-account/confirm-report?sessionId=${committedSession._id}`);
       }
     } catch (error: any) {
       const message = error?.response?.data?.error || 'Failed to add to confirm report';
@@ -367,7 +417,7 @@ export default function ReportPage() {
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-[#fcfbeb] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ad010d]"></div>
+        <CircularLoader />
       </div>
     );
   }
@@ -650,7 +700,10 @@ export default function ReportPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => removeFromCart(item.account)}
+                        onClick={() => {
+                          const account = accounts.find(a => a._id === item.account);
+                          removeFromCart(item.account, account?.accountNo || 'Account');
+                        }}
                         className="p-2 text-red-500 hover:bg-red-50 rounded-full transition"
                       >
                         <X size={20} />
@@ -731,6 +784,20 @@ export default function ReportPage() {
           </div>
         </div>
       )}
+
+      <ConfirmationDialog
+        isOpen={confirmDialogOpen}
+        onClose={() => {
+          setConfirmDialogOpen(false);
+          setItemToRemove(null);
+        }}
+        onConfirm={confirmRemoveFromCart}
+        title="Remove from Cart"
+        message={`Are you sure you want to remove account ${itemToRemove?.accountNo} from the cart?`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant="warning"
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ export interface IRDAccount extends Document {
   monthPaidUpTo: number;
   nextInstallmentDueDate: Date;
   lastDepositDate?: Date; // Optional: May not exist for a new account
+  maturityDate: Date; // Date when 60th installment is due
   createdAt: Date;
   updatedAt: Date;
 }
@@ -59,8 +60,11 @@ const RDAccountSchema = new Schema<IRDAccount>({
   lastDepositDate: { 
     type: Date,
     required: false // This field is optional
-  }
-  ,
+  },
+  maturityDate: {
+    type: Date,
+    required: [true, 'Maturity date is required']
+  },
   user: {
     type: Schema.Types.ObjectId,
     ref: 'User',

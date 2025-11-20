@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Logo from '../images/Logo.png';
 import Logo_name from '../images/Logo_name.png';
+import CircularLoader from '@/components/CircularLoader';
 
 interface RDAccount {
   _id: string;
@@ -173,7 +174,7 @@ export default function DashboardPage() {
           
           {isLoadingAccounts ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ad010d]"></div>
+              <CircularLoader />
             </div>
           ) : rdAccounts.length === 0 ? (
             <div className="bg-[#fcfbeb] rounded-lg p-6 text-center">
@@ -199,7 +200,7 @@ export default function DashboardPage() {
                       aria-label={`Open account ${account.accountName}`}
                       className="flex flex-col items-center gap-1"
                     >
-                      <div className="w-14 h-14 rounded-full bg-[#ad010d] flex items-center justify-center text-white font-bold text-lg shadow-md hover:scale-105 transition-transform">
+                      <div className="w-14 h-14 min-w-[56px] min-h-[56px] rounded-full bg-[#ad010d] flex items-center justify-center text-white font-bold text-lg shadow-md hover:scale-105 transition-transform flex-shrink-0">
                         {initial}
                       </div>
                       <span className="text-xs text-center text-gray-800 truncate w-16">{firstWord}</span>
@@ -228,22 +229,26 @@ export default function DashboardPage() {
       >
         <div className="flex items-center gap-3">
           {/* Search Bar */}
-          <div className="flex-1 flex items-center gap-3 bg-white/70 backdrop-blur-sm rounded-full px-4 py-3 shadow-lg">
-            <Search className="text-gray-600" size={24} />
+          <div className="flex-1 max-w-[calc(100%-60px)] flex items-center gap-3 bg-white/70 backdrop-blur-sm rounded-full px-4 py-3 shadow-lg">
+            <Search className="text-gray-600 flex-shrink-0" size={20} />
             <input
               type="text"
-              placeholder="Pay friends and merchants"
+              placeholder="Search here..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => router.push('/search')}
-              className="flex-1 bg-transparent text-gray-800 placeholder-gray-500 outline-none"
+              className="flex-1 min-w-0 bg-transparent text-gray-800 placeholder-gray-500 outline-none text-sm"
             />
           </div>
 
-          {/* User Profile */}
-          <div className="w-12 h-12 rounded-full bg-[#ad010d] text-white flex items-center justify-center font-bold text-xl shadow-lg">
+          {/* User Profile (clickable) */}
+          <button
+            onClick={() => router.push('/profile')}
+            aria-label="Open profile"
+            className="w-12 h-12 min-w-[48px] rounded-full bg-[#ad010d] text-white flex items-center justify-center font-bold text-xl shadow-lg flex-shrink-0"
+          >
             {displayName.charAt(0).toUpperCase()}
-          </div>
+          </button>
         </div>
       </div>
 

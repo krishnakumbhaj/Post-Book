@@ -61,11 +61,18 @@ export async function POST(request: NextRequest) {
       denomination, 
       monthPaidUpTo, 
       nextInstallmentDueDate, 
-      lastDepositDate 
+      lastDepositDate,
+      maturityDate,
+      targetUserId // Allow agents to specify which user to create account for
     } = body;
 
+    // Determine which user this account is for
+    // If targetUserId is provided (agent creating for user), use that
+    // Otherwise use the logged-in user's ID
+    const accountOwnerUserId = targetUserId || userId;
+
     // Validate required fields
-    if (!accountNo || !accountName || !openingDate || !denomination || monthPaidUpTo === undefined || !nextInstallmentDueDate) {
+    if (!accountNo || !accountName || !openingDate || !denomination || monthPaidUpTo === undefined || !nextInstallmentDueDate || !maturityDate) {
       return NextResponse.json(
         { ok: false, error: 'Missing required fields' },
         { status: 400 }
@@ -91,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     const existingAccount = await RDAccountModel.findOne({ 
       accountNo, 
-      user: userId 
+      user: accountOwnerUserId 
     });
 
     if (existingAccount) {
@@ -102,14 +109,14 @@ export async function POST(request: NextRequest) {
     }
 
     const mSession = await mongoose.startSession();
-    let newAccount;
+    let newAccount: any = null;
 
     try {
       await mSession.withTransaction(async () => {
         // Create the RD account
         const accounts = await RDAccountModel.create(
           [{
-            user: userId,
+            user: accountOwnerUserId,
             accountNo,
             accountName,
             openingDate: new Date(openingDate),
@@ -118,13 +125,15 @@ export async function POST(request: NextRequest) {
             totalDepositAmount: totalDepositAmount.toString(),
             nextInstallmentDueDate: new Date(nextInstallmentDueDate),
             lastDepositDate: lastDepositDate ? new Date(lastDepositDate) : undefined,
+            maturityDate: new Date(maturityDate),
           }],
           { session: mSession }
         );
         newAccount = accounts[0];
 
+        // Add account to the target user's myRegisterAccount array
         await UserModel.updateOne(
-          { _id: userId },
+          { _id: accountOwnerUserId },
           { $push: { myRegisterAccount: newAccount._id } },
           { session: mSession }
         );
@@ -135,8 +144,8 @@ export async function POST(request: NextRequest) {
       // Handle duplicate key error: fetch existing account and return success to client
       if (txError && (txError.code === 11000 || (txError.keyValue && txError.keyValue.accountNo))) {
         try {
-          const existing = await RDAccountModel.findOne({ accountNo, user: userId }).lean();
-          const populatedUser = await UserModel.findById(userId).populate('myRegisterAccount').lean();
+          const existing = await RDAccountModel.findOne({ accountNo, user: accountOwnerUserId }).lean();
+          const populatedUser = await UserModel.findById(accountOwnerUserId).populate('myRegisterAccount').lean();
 
           return NextResponse.json(
             {
@@ -158,17 +167,32 @@ export async function POST(request: NextRequest) {
 
     await mSession.endSession();
 
-    const user = await UserModel.findById(userId)
+    if (!newAccount) {
+      return NextResponse.json(
+        { ok: false, error: 'Failed to create account - account is null after transaction' },
+        { status: 500 }
+      );
+    }
+
+    // Fetch the account fresh from DB to ensure it's properly populated
+    const createdAccount = await RDAccountModel.findById(newAccount._id).lean();
+    const user = await UserModel.findById(accountOwnerUserId)
       .populate('myRegisterAccount')
       .lean();
 
     const transformedUser = transform(user);
+    const transformedAccount = transform(createdAccount);
+
+    console.log('RD Account created successfully:', {
+      accountId: newAccount._id,
+      accountNo: createdAccount?.accountNo
+    });
 
     return NextResponse.json(
       {
         ok: true,
         message: 'RD Account created successfully',
-        account: transform(newAccount),
+        account: transformedAccount,
         user: transformedUser,
       },
       { status: 201 }

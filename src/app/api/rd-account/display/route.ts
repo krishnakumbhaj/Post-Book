@@ -86,6 +86,7 @@ function transform(doc: any) {
   if (a.openingDate) a.openingDate = new Date(a.openingDate).toISOString();
   if (a.nextInstallmentDueDate) a.nextInstallmentDueDate = new Date(a.nextInstallmentDueDate).toISOString();
   if (a.lastDepositDate) a.lastDepositDate = new Date(a.lastDepositDate).toISOString();
+  if (a.maturityDate) a.maturityDate = new Date(a.maturityDate).toISOString();
   if (a.createdAt) a.createdAt = new Date(a.createdAt).toISOString();
   if (a.updatedAt) a.updatedAt = new Date(a.updatedAt).toISOString();
   return a;

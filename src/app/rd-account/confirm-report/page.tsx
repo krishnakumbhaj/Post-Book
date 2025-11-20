@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Check, X, AlertCircle, Undo2, Plus, Home, User, FileText, Eye } from 'lucide-react';
@@ -10,6 +11,8 @@ import dayjs from 'dayjs';
 import { NotepadTextDashed } from 'lucide-react';
 import logo from '@/app/images/Logo.png';
 import logo_name from '@/app/images/Logo_name.png';
+import CircularLoader from '@/components/CircularLoader';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -63,6 +66,8 @@ export default function ConfirmReportPage() {
   const [loading, setLoading] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [reverting, setReverting] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [sessionToCancel, setSessionToCancel] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.role === 'Agent') {
@@ -78,20 +83,32 @@ export default function ConfirmReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, session]);
 
+  // If a sessionId query param is present, prioritize it after loading
+  const searchParams = useSearchParams();
+  const highlightSessionId = searchParams?.get('sessionId');
+
   const loadData = async () => {
     setLoading(true);
     try {
       const sessionsResponse = await axios.get('/api/rd-account/payment-session?status=ongoing');
       const committedResponse = await axios.get('/api/rd-account/payment-session?status=committed');
       
-      const ongoingSessions = sessionsResponse.data.sessions || [];
+      let ongoingSessions = sessionsResponse.data.sessions || [];
       const committedSessions = committedResponse.data.sessions || [];
-      
-      const filteredOngoing = ongoingSessions.filter((s: PaymentSession) => 
-        s.items.some(item => item.added)
-      );
-      
-      setSessions([...filteredOngoing, ...committedSessions]);
+
+      // Filter only sessions that have added items
+      ongoingSessions = ongoingSessions.filter((s: PaymentSession) => s.items.some(item => item.added));
+
+      // If highlightSessionId is present, move that session to the front
+      if (highlightSessionId) {
+        const idx = ongoingSessions.findIndex((s: PaymentSession) => s._id === highlightSessionId);
+        if (idx >= 0) {
+          const [match] = ongoingSessions.splice(idx, 1);
+          ongoingSessions.unshift(match);
+        }
+      }
+
+      setSessions([...ongoingSessions, ...committedSessions]);
 
       const accountsResponse = await axios.get('/api/rd-account/display');
       if (accountsResponse.data.ok) {
@@ -348,13 +365,16 @@ export default function ConfirmReportPage() {
     }
   };
 
-  const handleCancel = async (sessionId: string) => {
-    if (!confirm('Are you sure you want to cancel this session?')) {
-      return;
-    }
+  const handleCancel = (sessionId: string) => {
+    setSessionToCancel(sessionId);
+    setConfirmDialogOpen(true);
+  };
+
+  const confirmCancel = async () => {
+    if (!sessionToCancel) return;
 
     try {
-      await axios.delete(`/api/rd-account/payment-session/${sessionId}`);
+      await axios.delete(`/api/rd-account/payment-session/${sessionToCancel}`);
       toast({
         title: 'Cancelled',
         description: 'Session cancelled successfully',
@@ -367,6 +387,8 @@ export default function ConfirmReportPage() {
         description: err?.response?.data?.error || 'Failed to cancel session',
         variant: 'destructive',
       });
+    } finally {
+      setSessionToCancel(null);
     }
   };
 
@@ -384,7 +406,7 @@ export default function ConfirmReportPage() {
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-[#fcfbeb] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ad010d]"></div>
+        <CircularLoader />
       </div>
     );
   }
@@ -393,30 +415,30 @@ export default function ConfirmReportPage() {
     <div className="min-h-screen bg-[#fcfbeb] pb-20">
       {/* Header */}
       <div className="bg-[#ad010d] text-white p-4 sticky top-0 z-40 shadow-lg">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-white/10 rounded-full transition"
+            className="p-2 hover:bg-white/10 rounded-full transition flex-shrink-0"
           >
-            <ArrowLeft size={24} />
+            <ArrowLeft size={20} />
           </button>
-          <div className="flex-1">
-            <h1 className="text-xl font-semibold">Payment Reports</h1>
-            <div className="flex items-center gap-4 mt-1">
-              <span className="text-sm text-white/90">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg font-semibold truncate">Payment Reports</h1>
+            <div className="flex items-center gap-2 sm:gap-4 mt-1 flex-wrap">
+              <span className="text-xs sm:text-sm text-white/90 whitespace-nowrap">
                 Pending: <span className="font-bold text-yellow-300">{sessions.filter(s => s.status !== 'committed').length}</span>
               </span>
-              <span className="text-sm text-white/90">
+              <span className="text-xs sm:text-sm text-white/90 whitespace-nowrap">
                 Completed: <span className="font-bold text-green-300">{sessions.filter(s => s.status === 'committed').length}</span>
               </span>
             </div>
           </div>
           <button
             onClick={() => router.push('/rd-account/report')}
-            className="p-2 bg-[#f4a84c] hover:bg-white/30 rounded-full transition"
+            className="p-2 bg-[#f4a84c] hover:bg-white/30 rounded-full transition flex-shrink-0"
             title="Create new report"
           >
-            <Plus size={24} />
+            <Plus size={20} />
           </button>
         </div>
       </div>
@@ -452,45 +474,44 @@ export default function ConfirmReportPage() {
                 }`}
               >
                 {/* Card Header */}
-                <div className={`p-5 relative ${isCommitted ? 'bg-gradient-to-r from-green-100 to-green-50' : 'bg-gradient-to-r from-gray-50 to-white'}`}>
+                <div className={`p-4 sm:p-5 relative ${isCommitted ? 'bg-gradient-to-r from-green-100 to-green-50' : 'bg-gradient-to-r from-gray-50 to-white'}`}>
                   {/* PDF Download Button - Top Right */}
                   <button
                     onClick={() => handleDownloadPDF(session._id)}
-                    className="absolute top-24 right-4 p-2.5 bg-[#ad010d] hover:bg-[#ad010d] hover:text-white textwhite rounded-full shadow-md transition-all hover:scale-105"
+                    className="absolute top-4 right-4 p-2 sm:p-2.5 bg-[#ad010d] hover:bg-[#8d0108] text-white rounded-full shadow-md transition-all hover:scale-105 z-10"
                     title="Download PDF Report"
                   >
-                    <FileText className='text-white' size={20} />
+                    <FileText size={18} />
                   </button>
 
-                  <div className="flex items-start justify-between pr-16">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        {isCommitted ? (
-                          <span className="inline-flex items-center gap-2 bg-green-600 text-white text-sm px-3 py-1.5 rounded-full font-medium shadow-sm">
-                            <Check size={16} /> Completed
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-2 bg-yellow-500 text-white text-sm px-3 py-1.5 rounded-full font-medium shadow-sm">
-                            <AlertCircle size={16} /> Pending
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500  px-2 py-1 rounded">
-                          {dayjs(session.createdAt).format('MMM D, YYYY')}
+                  <div className="flex flex-col gap-3 pr-12">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isCommitted ? (
+                        <span className="inline-flex items-center gap-1.5 bg-green-600 text-white text-xs px-2.5 py-1 rounded-full font-medium shadow-sm">
+                          <Check size={14} /> Completed
                         </span>
-                      </div>
-                      <p className="text-sm text-gray-600 flex items-center gap-2">
-                        <span className="font-medium">Payment:</span>
-                        <span className="capitalize  px-2 py-0.5 rounded text-xs">{session.paymentMethod}</span>
-                      </p>
-                      {session.committedAt && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Committed: {dayjs(session.committedAt).format('MMM D, YYYY h:mm A')}
-                        </p>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 bg-yellow-500 text-white text-xs px-2.5 py-1 rounded-full font-medium shadow-sm">
+                          <AlertCircle size={14} /> Pending
+                        </span>
                       )}
+                      <span className="text-xs text-gray-500 px-2 py-1 rounded">
+                        {dayjs(session.createdAt).format('MMM D, YYYY')}
+                      </span>
+                      <span className="text-xs text-gray-600 capitalize px-2 py-1 bg-white rounded-full">
+                        {session.paymentMethod}
+                      </span>
                     </div>
-                    <div className="text-right ml-4">
-                      <div className="text-2xl font-bold text-[#ad010d] mb-1">₹{total.toFixed(2)}</div>
-                      <div className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full inline-block">
+                    
+                    {session.committedAt && (
+                      <p className="text-xs text-gray-500">
+                        Committed: {dayjs(session.committedAt).format('MMM D, h:mm A')}
+                      </p>
+                    )}
+                    
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="text-xl sm:text-2xl font-bold text-[#ad010d]">₹{total.toFixed(2)}</div>
+                      <div className="text-xs sm:text-sm text-gray-600 bg-white px-2.5 py-1 rounded-full">
                         {addedItems.length} account{addedItems.length !== 1 ? 's' : ''}
                       </div>
                     </div>
@@ -668,6 +689,20 @@ export default function ConfirmReportPage() {
           </button>
         </div>
       </div>
+
+      <ConfirmationDialog
+        isOpen={confirmDialogOpen}
+        onClose={() => {
+          setConfirmDialogOpen(false);
+          setSessionToCancel(null);
+        }}
+        onConfirm={confirmCancel}
+        title="Cancel Session"
+        message="Are you sure you want to cancel this session? This action cannot be undone."
+        confirmText="Cancel Session"
+        cancelText="Keep Session"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Search, Home, User, Calendar, TrendingUp, Wallet, AlertCircle, X } from 'lucide-react';
+import { Search, Home, User, Calendar, TrendingUp, Wallet, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import axios from 'axios';
 import dayjs from 'dayjs';

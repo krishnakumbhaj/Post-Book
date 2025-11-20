@@ -196,8 +196,8 @@ export default function ReportPage() {
     const existingItem = currentSession.items.find(item => item.account === account._id);
 
     if (existingItem) {
-      // Remove from session
-      await removeFromCart(account._id);
+      // Prompt removal from session (open confirmation dialog)
+      removeFromCart(account._id, account.accountNo);
       return;
     }
 
